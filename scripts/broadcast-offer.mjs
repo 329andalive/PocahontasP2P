@@ -1,6 +1,10 @@
 import { finalizeEvent, getPublicKey, nip19, Relay } from 'nostr-tools'
-import WebSocket from 'ws'
-globalThis.WebSocket = WebSocket
+try {
+    if (typeof globalThis.WebSocket === 'undefined') {
+        const { default: WS } = await import('ws')
+        globalThis.WebSocket = WS
+    }
+} catch {}
 
 function hexToBytes(hex) {
     if (hex.startsWith('0x')) hex = hex.slice(2)
@@ -31,7 +35,7 @@ function parseArgs() {
             return [k, rest.join('=')]
         })
     )
-    return {
+    const parsed = {
         amount: Number(args.amount ?? '0'),
         currency: String(args.currency ?? 'USD'),
         discountPercent: Number(args.discount ?? '0'),
@@ -40,6 +44,11 @@ function parseArgs() {
         relays: String(args.relays ?? 'wss://relay.damus.io').split(',').map((s) => s.trim()).filter(Boolean),
         d: String(args.d ?? `offer-${Date.now()}`)
     }
+    const allowed = new Set(['USD', 'EUR'])
+    if (!allowed.has(parsed.currency)) {
+        throw new Error(`currency must be one of: ${[...allowed].join(', ')}`)
+    }
+    return parsed
 }
 
 async function publishToRelays(relays, event) {
